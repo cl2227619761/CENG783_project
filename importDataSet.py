@@ -27,7 +27,7 @@ def findTheFiles():
                     file_name_with_path = os.path.join(root, file)
                     if verbose == 1:
                         print(file_name_with_path)
-                    nameDataset.update({file_name_with_path:[-1,-1,-1]})  # [PipeLabel, CableLabel, DiverLabel]
+                    nameDataset.update({file_name_with_path:np.array([-1,-1,-1], dtype=np.float32)})  # [PipeLabel, CableLabel, DiverLabel]
                     total_number_of_images += 1
 
 
@@ -82,7 +82,31 @@ def showSomeSamples(dict):
         ax.set_yticks([])
     plt.show()
 
-def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=100,image_count=None):
+def showObtainedImages(imageArray,labelArray):
+    numberofimages = len(imageArray)
+
+    fig, axes = plt.subplots(3, 3)
+    fig.subplots_adjust(hspace=0.3, wspace=0.3)
+
+    for i, ax in enumerate(axes.flat):
+        random_location = int(np.random.rand(1, 1) * numberofimages)
+        ax.imshow(imageArray[random_location])
+        labelstr=""
+        if labelArray[random_location,0] == 1:
+            labelstr = labelstr+"Pipe "
+
+        if labelArray[random_location,1] == 1:
+            labelstr = labelstr+"Cable "
+
+        if labelArray[random_location,2] == 1:
+            labelstr = labelstr+"Diver "
+
+        ax.set_xlabel(labelstr)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    plt.show()
+
+def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=1,image_count=None):
     iteration=0
     writer = None
     for current_file, key in enumerate(name_dataset.keys()):
@@ -118,11 +142,13 @@ def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=
         # fig = plt.figure()
         # plt.imshow(image_resized)
         # plt.show()
+        # image_flat = np.reshape(image_resized,newshape=[240*320*3])
         image_bytes = image_resized.tobytes()
-        print(label, image_resized.shape)
+        label_bytes = label.tobytes()
+        print(label.shape, image_resized.shape)
 
         feature = tf.train.Features(
-            feature = {'label': tf.train.Feature(float_list=tf.train.FloatList(value=label)),
+            feature = {'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[label_bytes])),
 
                        'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image_bytes]))}
         )
@@ -134,34 +160,37 @@ def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=
 def readAndDecode(filename_queue):
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(filename_queue)
-    features = tf.parse_single_example(
-    serialized_example,
-        features={
-        'label': tf.FixedLenFeature([], tf.float32),
-        'image': tf.FixedLenFeature([], tf.string)
-        })
-    image_flat = tf.decode_raw(features['image'], tf.float32)
-    image = tf.reshape(image_flat, [240, 320, 3])
-    label = tf.cast(features['label'], tf.float32)
+    features = tf.parse_single_example(serialized_example,features={
+                                                            'label': tf.FixedLenFeature([], tf.string),
+                                                            'image': tf.FixedLenFeature([], tf.string)
+                                                            })
+    image_flat = tf.decode_raw(features['image'], np.uint8)
+    label_flat = tf.decode_raw(features['label'], np.float32)
+    image = tf.reshape(image_flat,[240,320,3])
+    label = tf.reshape(label_flat,[3,])
+
     return image, label
 
 
 def getBatchFromFile(FILE,n_batch):
-    dict = {}
-    with tf.Session() as sess:
-        filename_queue = tf.train.string_input_producer(tf.train.match_filenames_once(FILE + "*.tfrecords"))
-        with tf.device('/cpu:0'):
-            image, label = readAndDecode(filename_queue)
-            init_op = tf.global_variables_initializer()
-            sess.run(init_op)
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(coord=coord)
-            for i in range(0, n_batch):
-                example, l = sess.run([image, label])
-                dict.update({image:label})
-            coord.request_stop()
-            coord.join(threads)
-    return dict
+    sess = tf.InteractiveSession()
+    image_batch = np.zeros(shape=[n_batch, 240, 320, 3])
+    label_batch = np.zeros(shape=[n_batch, 3])
+    filename_queue = tf.train.string_input_producer(["/media/pc12/DATA/final_dataset/tf/maris0.tfrecords"])
+    with tf.device('/cpu:0'):
+        image, label= readAndDecode(filename_queue)
+        init_op = tf.global_variables_initializer()
+        sess.run(init_op)
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        for i in range(0, n_batch):
+            example, l= sess.run([image, label])
+            image_batch[i] = example
+            label_batch[i] = l
+        coord.request_stop()
+        coord.join(threads)
+    sess.close()
+    return image_batch,label_batch
 
 totalNumberOfImages, nameDataset = findTheFiles()
 # showSomeSamples(nameDataset)
@@ -176,5 +205,8 @@ if verbose == 1:
     #     print(nameDataset[item])
 
 # writeTfrecords(nameDataset, "/media/pc12/DATA/final_dataset/tf/", image_count=totalNumberOfImages)
-dict = getBatchFromFile("/media/pc12/DATA/final_dataset/tf/",10)
-showSomeSamples(dict)
+imageBatch,labelBatch = getBatchFromFile("/media/pc12/DATA/final_dataset/tf/",1000)
+print(imageBatch[800,:,:,1])
+image11 = io.imread("/media/pc12/DATA/final_dataset/set1/frame01641_set1_0.png")
+print(image11[:,:,2])
+showObtainedImages(imageBatch,  labelBatch)

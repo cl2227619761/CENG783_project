@@ -4,16 +4,15 @@ import matplotlib.pyplot as plt
 import os
 import matplotlib.image as mpimg
 from skimage import io
-location = "/media/pc12/DATA/final_dataset/"  # Location of the dataset
-sets = [location+"set1/",
-        location+"set2/",
-        location+"set3/"]  # Locations of the images
+
 
 itemNumbers=[0,0,0]
 
-verbose = 0
+def findTheFiles(location, verbose=0):
+    sets = [location + "set1/",
+            location + "set2/",
+            location + "set3/"]  # Locations of the images
 
-def findTheFiles():
     total_number_of_images = 0
     nameDataset = {}
     for i in range(3):
@@ -54,9 +53,9 @@ def findTheFiles():
             nameDataset[image_name_itself][2] = 1
             itemNumbers[2] += 1
         diver_file.close()
-    return total_number_of_images, nameDataset
+    return total_number_of_images, nameDataset, itemNumbers
 
-def showSomeSamples(dict):
+def showSomeSamples(dict,verbose=0):
     numberofimages = len(dict.keys())
     items = []
     fig, axes = plt.subplots(3, 3)
@@ -82,7 +81,7 @@ def showSomeSamples(dict):
         ax.set_yticks([])
     plt.show()
 
-def showObtainedImages(imageArray,labelArray):
+def showObtainedImages(imageArray,labelArray,verbose=0):
     numberofimages = len(imageArray)
 
     fig, axes = plt.subplots(3, 3)
@@ -113,7 +112,7 @@ def readTheImageAndResize(file_name):
     image = tf.image.decode_png(image_file)
     return image
 
-def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=20,image_count=None):
+def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=20,image_count=None,verbose=0):
     iteration=0
     writer = None
     file_list = []
@@ -139,7 +138,7 @@ def writeTfrecords(name_dataset, output_location, how_many_files=1000,totalFile=
 
             iteration += 1
 
-        if (image_count != None and current_file == totalNumberOfImages) or iteration == totalFile+1:
+        if (image_count != None and current_file == image_count) or iteration == totalFile+1:
             break
         #Read the image and decode
         image = io.imread(file_name)
@@ -186,7 +185,7 @@ def readAndDecode(filename_queue):
 
     return image, label
 
-def get_file_list(tf_record_location):
+def get_file_list(tf_record_location,):
     file_list = []
     for root, dirs, files in os.walk(tf_record_location):
         for file in files:
@@ -195,17 +194,18 @@ def get_file_list(tf_record_location):
                 file_list.append(file_name_with_path)
     return file_list
 
-def getBatchFromFile(FILE, file_list = None, file_number=None, n_batch=1000):
+def getBatchFromFile(location, file_list = None, file_number=None, n_batch=1000,verbose=0):
     sess = tf.InteractiveSession()
     image_batch = np.zeros(shape=[n_batch, 240, 320, 3],dtype=np.uint8)
     label_batch = np.zeros(shape=[n_batch, 3],dtype=np.float32)
     if file_number != None:
-        filename_queue = tf.train.string_input_producer([location+"tf/maris"+str(file_number)+".tfrecords"])
+        filename_queue = tf.train.string_input_producer([location+"maris"+str(file_number)+".tfrecords"])
     else:
         if file_list == None:
-            file_list = get_file_list(location+"tf/")
+            file_list = get_file_list(location)
         filename_queue = tf.train.string_input_producer(file_list)
-        print(file_list)
+        if verbose==0:
+            print(file_list)
     with tf.device('/cpu:0'):
         image, label= readAndDecode(filename_queue)
         init_op = tf.global_variables_initializer()
@@ -219,22 +219,6 @@ def getBatchFromFile(FILE, file_list = None, file_number=None, n_batch=1000):
         coord.request_stop()
         coord.join(threads)
     sess.close()
+    print("Batch is taken!")
     return image_batch,label_batch
 
-totalNumberOfImages, nameDataset = findTheFiles()
-# showSomeSamples(nameDataset)
-if verbose == 1:
-    items = ["pipe","cable","diver"]
-    print("There are total {0} images in the dataset".format(totalNumberOfImages))
-    for i, item in enumerate(itemNumbers):
-        print("There are {0} {1}-containing image".format(item, items[i]))
-
-    # for item in nameDataset.keys():
-    #     print(item + "-->")
-    #     print(nameDataset[item])
-
-# file_list = writeTfrecords(nameDataset, "/media/pc12/DATA/final_dataset/tf/", image_count=totalNumberOfImages)
-imageBatch,labelBatch = getBatchFromFile("/media/pc12/DATA/final_dataset/tf/",n_batch=2000)
-print("Batch is taken!")
-print(imageBatch.shape,labelBatch.shape)
-showObtainedImages(imageBatch,  labelBatch)

@@ -55,15 +55,15 @@ class WSCNN:
                 # 'bias5_3': tf.Variable(self.weightsAndBiases['conv5_3_b'])
             }
             self.conv_out1 = tf.Variable(
-                                        tf.truncated_normal([10, 10, 256, 1024], dtype=tf.float32, stddev=1e-1),
+                                        tf.constant(0.5, shape=[10, 10, 256, 1024], dtype=tf.float32),
                                         trainable=True, name='Conv_like_fully1')
 
             self.bias_out1 = tf.Variable(
-                                        tf.constant(0.0, shape=[1024], dtype=tf.float32),
+                                        tf.constant(1e-7, shape=[1024], dtype=tf.float32),
                                         trainable=True, name='Conv_like_fully1_bias')
 
             self.conv_out2 = tf.Variable(
-                                        tf.truncated_normal([1, 1, 1024, 3], dtype=tf.float32, stddev=1e-1),
+                                        tf.constant(1e-7, shape=[1, 1, 1024, 3], dtype=tf.float32),
                                         trainable=True, name='Conv_like_fully2')
 
             self.bias_out2 = tf.Variable(
@@ -81,7 +81,7 @@ class WSCNN:
 
         # PREPROCESSING WILL COME HERE
         # first convert images back to float32, convolution requires that
-        images = tf.image.convert_image_dtype(self.batch, dtype=tf.float32, name="uint8_2_float")
+        images = tf.image.convert_image_dtype(self.batch, dtype=tf.float32, name="uint8_2_float")*(1./255)-0.5
         print(images.get_shape())
 
         # zero padding from 240*320 to 320*320 for each image

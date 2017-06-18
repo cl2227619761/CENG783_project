@@ -70,9 +70,9 @@ class WSCNN:
                                         tf.constant(0.0, shape=[3], dtype=tf.float32),
                                         trainable=True, name='Conv_like_fully2_bias')
 
-        init_op = tf.group(tf.global_variables_initializer(),
-                           tf.local_variables_initializer())
+        init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
         session.run(init_op)
+
         if verbose == 1:
             for key in self.weights.keys():
                 print("Name: {}, Shape = {}".format(key, self.weights[key].get_shape()))

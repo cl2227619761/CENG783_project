@@ -1,2 +1,6 @@
 .npz
 *.npz
+*.iml
+*.log
+*.xml
+*.pyc
